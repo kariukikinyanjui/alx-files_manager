@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const dbClient = require('../utils/db');
 const redisClient = require('../utils/redis');
 const { ObjectId } = require('mongodb');
+const userQueue = new Queue('userQueue');
 
 class UsersController {
   static async postNew (req, res) {
@@ -33,6 +34,7 @@ class UsersController {
       id: result.insertedId,
       email
     });
+    await userQueue.add({ userId: result.insertedId.toString() });
   }
 
   static async getMe (req, res) {
