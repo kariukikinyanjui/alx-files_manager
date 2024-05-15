@@ -5,6 +5,7 @@ const dbClient = require('../utils/db');
 const redisClient = require('../utils/redis');
 const { ObjectId } = require('mongodb');
 const mime = require('mime-types');
+const fileQueue = new Queue('fileQueue');
 
 class FilesController {
   static async postUpload (req, res) {
@@ -50,6 +51,11 @@ class FilesController {
 
       const result = await dbClient.db.collection('files').insertOne(fileData);
       return res.status(201).json({ id: result.insertedId, ...fileData });
+    }
+
+    if (file.type === 'image') {
+    // Add a job to the fileQueue for thumbnail processing
+      await fileQueue.add({ userId: file.userId, fileId: file._id });
     }
   }
 
@@ -159,10 +165,17 @@ class FilesController {
       return res.status(404).json({ error: 'Not found' });
     }
 
+    const mimeType = mime.lookup(sizePath);
+    res.setHeader('Content-Type', mimeType);
+    fs.createReadStream(sizePath).pipe(res);
+  }
+
     const mimeType = mime.lookup(file.name);
     res.setHeader('Content-Type', mimeType);
     fs.createReadStream(file.localPath).pipe(res);
   }
+
+    
 }
 
 module.exports = FilesController;
