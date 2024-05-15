@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const dbClient = require('../utils/db');
 const redisClient = require('../utils/redis');
+const { ObjectId } = require('mongodb');
 
 class FilesController {
   static async postUpload (req, res) {
@@ -49,6 +50,45 @@ class FilesController {
       const result = await dbClient.db.collection('files').insertOne(fileData);
       return res.status(201).json({ id: result.insertedId, ...fileData });
     }
+  }
+
+  static async getShow (req, res) {
+    const token = req.headers['x-token'];
+    const userId = await redisClient.get(`auth_${token}`);
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const fileId = req.params.id;
+    const file = await dbClient.db.collection('files').findOne({ _id: ObjectId(fileId), userId: ObjectId(userId) });
+
+    if (!file) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    return res.status(200).json(file);
+  }
+
+  static async getIndex (req, res) {
+    const token = req.headers['x-token'];
+    const userId = await redisClient.get(`auth_${token}`);
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const parentId = req.query.parentId || '0';
+    const page = parseInt(req.query.page, 10) || 0;
+    const filesPerPage = 20;
+
+    const files = await dbClient.db.collection('files')
+      .find({ userId: ObjectId(userId), parentId })
+      .skip(page * filesPerPage)
+      .limit(filesPerPage)
+      .toArray();
+
+    return res.status(200).json(files);
   }
 }
 
