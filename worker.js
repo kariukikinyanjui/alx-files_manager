@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 const fileQueue = new Queue('fileQueue');
+const userQueue = new Queue('userQueue');
 
 fileQueue.process(async (job, done) => {
   const { fileId, userId } = job.data;
@@ -28,4 +29,29 @@ fileQueue.process(async (job, done) => {
   });
 
   done();
+});
+
+userQueue.process(async (job, done) => {
+  const { userId } = job.data;
+
+  if (!userId) {
+    done(new Error('Missing userId'));
+    return;
+  }
+
+  const user = await dbClient.db.collection('users').findOne({ _id: userId });
+  if (!user) {
+    done(new Error('User not found'));
+    return;
+  }
+
+  console.log(`Welcome ${user.email}!`);
+  // In real life, here you would call an email service to send the actual email
+
+  done();
+});
+
+// Start the worker
+userQueue.on('completed', (job, result) => {
+  console.log(`Sent welcome email to user ${job.data.userId}`);
 });
